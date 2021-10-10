@@ -1,0 +1,68 @@
+---
+title: "R introduction"
+author: "Kashvi Gandhi"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(gapminder)
+library(tidyverse)
+```
+
+
+ctrl+alt+I - shorcut to insert code-chunk
+
+```{r}
+gapminder %>% head() %>% kable()
+```
+
+```{r}
+View(gapminder)
+```
+
+```{r}
+gapminder$year == 2002
+```
+
+```{r}
+ggplot(gapminder, aes(x = gdpPercap, y= lifeExp, 
+                      colour = continent,
+                      shape = continent,
+                      size = pop)) + 
+  geom_point() + 
+  scale_x_log10()
+```
+
+```{r}
+ggplot(gapminder, aes(x = gdpPercap, y= lifeExp, 
+                      colour = continent,
+                      shape = continent)) + 
+  geom_line(aes(group = country)) + 
+  scale_x_log10()
+```
+
+```{r}
+gdp_data <- gapminder %>%
+  filter(year == max(year))
+
+life_exp_plot <- 
+  ggplot(gdp_data, aes(x=gdpPercap, y=lifeExp))+
+  geom_point(aes(color = continent,
+                 shape = continent,
+                 size = pop)) +
+  scale_color_viridis_d(option = "magma",
+                        direction = -1,
+                        begin = .2, end = .8)
+
+life_exp_plot + 
+  stat_smooth(formula = y ~ x, method = "loess", span=1)
+```
+
+```{r}
+life_exp_plot +
+  scale_x_log10() +
+  stat_smooth(formula = y ~ x, method = "lm") + 
+  xlab("GDP per capita") +
+  ylab("Life expectancy")
+```
