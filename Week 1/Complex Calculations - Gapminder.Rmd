@@ -1,0 +1,150 @@
+---
+title: 'Model Complexity: gapminder'
+author: "Kash"
+date: "10/10/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(gapminder)
+library(tidyverse)
+library(knitr)
+```
+
+# Plot of GDP per capita vs life Expectancy
+
+```{r}
+# method 1
+#     plot(gapminder$gdpPercap, gapminder$lifeExp)
+
+ggplot(gapminder, aes(x = gdpPercap, y = lifeExp)) + 
+  geom_point()
+
+```
+
+```{r}
+ggplot(gapminder%>% mutate(indicator = (country =="United Kingdom")), 
+       aes(x = gdpPercap, y = lifeExp)) + 
+  geom_point(aes(color = indicator))
+
+# can see that UK repeated in this dataset 
+```
+
+# PIPING
+
+gapminder %>% nrow()
+nrow(gapminder)
+
+```{r}
+
+gapminder %>% 
+  filter(year ==max(year)) %>%
+  pull(lifeExp) %>%
+  mean()
+
+gapminder %>%
+  filter(year == 2007) %>%
+  ggplot(aes(x = gdpPercap, y = lifeExp)) + 
+  geom_point()
+
+gapminder %>%
+  filter(year == 2007) %>%
+  ggplot(aes(x = gdpPercap, y = lifeExp)) + 
+  geom_point() +
+  geom_smooth()
+
+gapminder %>%
+  filter(year == 2007) %>%
+  ggplot(aes(x = gdpPercap, y = lifeExp)) + 
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE)
+
+```
+
+
+
+```{r}
+gm_2007 <- gapminder %>%
+  filter(year == 2007)
+
+model_lm <- lm(lifeExp ~ gdpPercap, data = gm_2007)
+
+summary(model_lm)
+
+residuals(model_lm)
+
+predict(model_lm)
+```
+
+Summary function is old and is not convenient to use. So, we use the broom library to have a more organised output.
+The main functions within broom library are: tidy() ; glance() ; augment()
+
+```{r}
+library(broom)
+tidy(model_lm)
+glance(model_lm)
+augment(model_lm)
+```
+
+```{r}
+augment(model_lm) %>%
+  ggplot(aes(gdpPercap, lifeExp)) +
+  geom_point() +
+  geom_line(aes(gdpPercap, .fitted))  # Bsically reworked my own way of plotting the reg line instead of using the geom_smooth() func. We fit the model using lm(), got the predictions from that func using augment(), plot those predictions on a line using geom_line()
+```
+
+# Now, instead of using linear model, we will use a complex model which will fit our model better. 
+
+Loess is the default func that ggplot uses when we use the stat_smooth() func
+
+Loess func has span=0.75 and degree=2 by default. 
+  Span: parameter which controls the degree of smoothening
+  Degree: degree of the polynomials to be used, normally 1 or 2 (degree 0 is also allowed but see note in help)
+
+```{r}
+model_loess <- loess(lifeExp ~ gdpPercap, data = gm_2007)
+
+model_loess_span <- loess(lifeExp ~ gdpPercap, span = 0.3, data = gm_2007)
+
+model_loess_span_degree <- loess(lifeExp ~ gdpPercap, span = 0.3, degree = 1, data = gm_2007)
+
+# note: broom func doesn't have a tidy() or a glance() func for loess models
+```
+
+Notice the difference between model_loess and model_loess_span. As you increase span towards 1, the smoother the curve becomes.
+When we set degree = 1, it means it is locally degree 1 ie. linear instead of locally parabolic.
+
+```{r}
+augment(model_loess) %>%
+  ggplot(aes(gdpPercap, lifeExp)) +
+  geom_point() +
+  geom_line(aes(gdpPercap, .fitted))
+
+augment(model_loess_span) %>%
+  ggplot(aes(gdpPercap, lifeExp)) +
+  geom_point() +
+  geom_line(aes(gdpPercap, .fitted))
+
+augment(model_loess_span_degree) %>%
+  ggplot(aes(gdpPercap, lifeExp)) +
+  geom_point() +
+  geom_line(aes(gdpPercap, .fitted))
+```
+
+# manually adding the square of a predicted variable ie. gdpPercap is not the same as a degree 2 loess! See below:
+
+```{r}
+model_lm2 <- lm(lifeExp ~ gdpPercap + poly(gdpPercap,2), data = gm_2007)
+
+augment(model_lm2) %>%
+  ggplot(aes(gdpPercap, lifeExp)) +
+  geom_point() +
+  geom_line(aes(gdpPercap, .fitted))
+```
+The reason is in the idea of local felxibility instead of this global model. Using a linear model and adding squared gdpPercap is a gloabl model ie. the values of parameters in this model that are used to predict some point on the left side of the plot are influenced by data points on the right side of the plot. This is not true for loess model.
+
+
