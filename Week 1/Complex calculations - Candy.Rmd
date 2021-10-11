@@ -1,0 +1,194 @@
+---
+title: 'Model Complexity: Candy'
+author: "Kash"
+date: "10/10/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(fivethirtyeight)
+library(tidyverse)
+library(broom)
+```
+
+In Model Complexity: Gapminder, we used different class of functions to add complexity.
+Here, we are going to make our model complex by adding more dimensions of predicted variables to them.
+
+```{r}
+candy_rankings
+```
+
+```{r}
+ggplot(candy_rankings, aes(x = pricepercent, y = winpercent)) +
+  geom_point()
+```
+
+# Fitting a simple linear model
+
+```{r}
+model_lm <- lm(winpercent ~ pricepercent, data = candy_rankings)
+tidy(model_lm)
+```
+
+```{r}
+augment(model_lm) %>%
+  ggplot(aes(x = pricepercent, y = winpercent)) + 
+  geom_point() +
+  geom_line(aes(y = .fitted))
+```
+# Adding categorical predicted variable
+
+Now, instead of using a locally elastic class of functions, we will continue using this function which are fit globally around the entire data set but make them more complex by adding mre variables to the model. 
+
+```{r}
+model_lm <- lm(winpercent ~ pricepercent + chocolate , data = candy_rankings)
+tidy(model_lm)
+```
+
+you will get same simple regression line but you will have different intercepts for the different levels of that categorical variable
+
+Interpretation: intercept = 41.57 is for candies without chocolate and 18.29 is the shift in intercept for candies with chocolate and 1.66 is the slope for the price percent variable.
+
+Now, let's plot this:
+
+```{r}
+augment(model_lm) %>%
+  ggplot(aes(x = pricepercent, y = winpercent, 
+             color = chocolate, 
+             shape = chocolate,
+             linetype = chocolate)) + 
+  geom_point() +
+  geom_line(aes(y = .fitted))
+```
+
+So, we have made a slightly more complex predicted model here. 
+You can see that the prediction that this model gives for each different type of candies are bit closer to the actual values compared to previous simple model where all types of candies got predicted from the same simple model. There were more candies that were further away from the predicted line in our earlier model. 
+
+# Adding a continuous variable
+
+When we do this, we can no longer create 2D plots. So, we will make a 3D plot.
+
+```{r}
+library(plotly)
+candy3d <- plot_ly(data = candy_rankings,
+                  x = ~pricepercent,
+                  y = ~sugarpercent,
+                  z = ~winpercent,
+                  type = "scatter3d")
+candy3d
+```
+
+
+Instead of regression line, we will have a regression plane.
+
+```{r}
+model_lm <- lm(winpercent ~ pricepercent + sugarpercent, 
+               data = candy_rankings)
+
+xy_plane <- expand.grid(0:100, 0:100)/100
+
+ps_plane <- xy_plane %>%
+  rename(pricepercent = Var1,
+         sugarpercent = Var2)
+
+lm_plane <- augment(model_lm, newdata = ps_plane)
+lm_matrix <- matrix(lm_plane$.fitted, nrow=101, ncol = 101)
+
+candy3d %>%
+  add_surface(
+    x = ~(0:100)/100,
+    y = ~(0:100)/100,
+    z = ~lm_matrix)
+
+```
+
+
+```{r}
+tidy(model_lm)
+```
+
+We can combine both continuous and categorical predicted variable.
+
+```{r}
+chocolate3d <- plot_ly(data = candy_rankings,
+                        x = ~pricepercent,
+                        y = ~sugarpercent,
+                        z = ~winpercent,
+                        color = ~chocolate,
+                        colours = c("#2d708e","#d8576b"),
+                        mode = "markers",
+                        symbol = ~chocolate,
+                        symbols = c("o","circle"),
+                        type = "scatter3d",
+                        showlegend = FALSE)
+chocolate3d
+```
+
+Here, the solid points have chocolate and the hollow dots dont have chocolate
+We now add regression plane to this:
+
+```{r}
+candy <- candy_rankings
+model_lm <- lm(winpercent ~ pricepercent + sugarpercent + chocolate, data = candy)
+
+ps_plane <- ps_plane %>%
+  mutate(chocolate = TRUE)
+lm_plane <- augment(model_lm, newdata = ps_plane)
+lm_matrix_true <- matrix(lm_plane$.fitted, nrow=101, ncol=101)
+
+ps_plane <- ps_plane %>%
+  mutate(chocolate=FALSE)
+lm_plane <- augment(model_lm, newdata = ps_plane)
+lm_matrix_false <- matrix(lm_plane$.fitted, nrow=101, ncol=101)
+
+chocolate3d %>% 
+  add_surface(
+    x = ~(0:100)/100,
+    y = ~(0:100)/100,
+    z = ~lm_matrix_true,
+    showscale = FALSE,
+    inherit = FALSE,
+    colorsfcale = list(c(0,1), c("#f0f921","#7201a8"))) %>%
+  add_surface(
+    x = ~(0:100)/100,
+    y = ~(0:100)/100,
+    z = ~lm_matrix_false,
+    showscale = FALSE,
+    inherit = FALSE,
+    colorscale = list(c(0,1), c("#3cbb75","#48157")))
+```
+
+```{r}
+tidy(model_lm)
+```
+
+# Model using all the predicted variables
+
+```{r}
+model_lm_all <- lm(winpercent ~ ., candy_rankings) 
+                # %>% select(~competitorname))
+tidy(model_lm_all)
+```
+
+See here when we fit all predicted variables, we run into an issue where every row of data has a name for the candy so every individual observation in the dataset has its own intercept shift because of using the name as a predicted variable.
+  So, to avoid this, we will select out the competitorname variable from our datatset.
+
+
+```{r}
+model_lm_all <- lm(winpercent ~ ., candy_rankings %>% select(-competitorname))
+tidy(model_lm_all)
+```
+
+# We can compare different models using the glance function in the broom packkage
+
+```{r}
+rbind(glance(model_lm), glance(model_lm_all))
+```
+
+Notice: R sqaure is higher for the more complex model. This is not surprising since adding more variables will increase the r square. 
+Look out for the adjusted r sqaure. This can increase or decrease whyen we add more variables. Here, the adjusted r sqaure increases and it is a bit better evidence that the more complex model is better at predicting the outcome.
+
