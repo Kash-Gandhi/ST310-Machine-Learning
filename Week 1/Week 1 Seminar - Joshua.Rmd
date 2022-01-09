@@ -1,0 +1,165 @@
+---
+title: "Week 1 Seminar"
+author: "Kash"
+date: "05/01/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(gapminder)
+library(tidyverse)
+```
+
+
+## Plotting
+
+```{r}
+# Base r method
+plot(gapminder$gdpPercap, gapminder$lifeExp)
+```
+
+```{r}
+#Tidyverse method
+ggplot(gapminder, aes(x = gdpPercap, 
+                      y = lifeExp, 
+                      color = continent)) +
+  geom_point() +
+  scale_x_log10()
+
+```
+
+```{r}
+ggplot(gapminder, aes(x = gdpPercap,
+                      y = lifeExp,
+                      color = continent,
+                      shape = continent,
+                      size = pop)) +
+  geom_point() +
+  scale_x_log10()
+
+# geom_line()
+#geom_line(aes(group = country))
+```
+
+One problem here is that there are a lot of points on this graph and not very easy to interpret. 
+
+Just look at the data for just a year - most recent is 2007
+
+```{r}
+# Base r method
+gapminder[gapminder$year == 2007,]
+
+# Tidyverse method
+gapminder %>%
+  filter(year == 2007)
+```
+
+```{r}
+gapminder %>%
+  filter(year == 2007) %>%
+  ggplot(aes(x = gdpPercap, 
+                        y = lifeExp,
+                        color = continent,
+                        shape = continent)) + 
+  geom_point() +
+  scale_x_log10()
+```
+
+This looks much better and easier to interpret. Here, the log scale works well too.
+
+```{r}
+gapminder %>% filter(year == 2007) %>%
+  ggplot(aes(x = gdpPercap,
+             y = lifeExp)) +
+  geom_point(aes(color = continent, shape = continent)) + 
+  geom_smooth()
+
+# geom_smooth(method = "lm")
+```
+
+```{r}
+gapminder %>% filter(year == 2007) %>%
+  ggplot(aes(x = gdpPercap,
+             y = lifeExp)) +
+  geom_point(aes(color = continent, shape = continent)) + 
+  geom_smooth(method = "lm", linetype = "dashed", se = FALSE) + # se = FALSE removes the confidence bands around the lines
+  geom_smooth(colour = "black", se = FALSE)
+  
+# showing both models in same plat
+```
+
+# NEW MODEL - LM and LM with Poly
+
+```{r}
+# store filtered dataset as gm2002
+gm2002 <- gapminder %>% filter(year == 2002)
+```
+
+
+```{r}
+# Fit linear modeland store the object as model_lm
+model_lm <- lm(lifeExp ~ gdpPercap, data = gm2002)
+model_poly <- lm(lifeExp ~ poly(gdpPercap,3), data = gm2002)
+```
+
+
+```{r}
+# Apply functions to the linear model object
+summary(model_lm)
+confint(model_lm) # confidence intervals
+plot(model_lm)
+predict(model_lm) #for each x axix value, what's the predicted y axix value
+residuals(model_lm) # compute residuals
+```
+
+```{r}
+gm2002 %>% 
+  mutate(predict_lm = predict(model_lm), 
+         predict_poly = predict(model_poly)) %>% #creates new variables or changes the variables
+  ggplot(aes(x = gdpPercap, y = lifeExp)) +
+  geom_point(aes(color = continent, shape = continent)) +
+  geom_line(aes(y = predict_lm), linetype = "dashed") + # If we use geom_point(aes(y = predict_lm)) instead, it shows the actual datapoints which are then connected to form this geom_line()
+  geom_line(aes(y = predict_poly))
+```
+
+Mean squared errors:
+
+```{r}
+mean(residuals(model_lm)^2)
+mean(residuals(model_poly)^2)
+# residuals(model_lm)^2 %>% mean()
+```
+ 
+Note that polynomial model has a lowered mean squared error, this is good! 
+We want to increase complexity of our model in hopes of reducing the mean squared error.
+
+# Q. Whats the limitation of making model more and more complex in hopes of improving the model?
+
+Eg. If we increase degree to say 9, the mean sqaured errror further decreases.
+So, should we just keep increasing the degree until the MSE goes as low as it can?
+
+Maybe try applying these models to a different year 
+```{r}
+gm2007 <- gapminder %>% filter(year ==2007)
+```
+
+```{r}
+# create a new variable for residuals
+gm2007 %>% mutate(
+  resid_lm = predict(model_lm, newdata = gm2007) - lifeExp,
+  resid_poly = predict(model_poly, newdata = gm2007) - lifeExp)
+```
+
+Now find MSE for resid_lm and resid_poly columns.
+
+
+
+
+
+
+
+

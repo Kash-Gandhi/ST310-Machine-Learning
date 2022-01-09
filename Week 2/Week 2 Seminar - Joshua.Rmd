@@ -1,0 +1,170 @@
+---
+title: "Week 2 Seminar"
+author: "Kash"  
+date: "07/01/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(gapminder)
+library(broom)
+theme_set(theme_minimal(base_size=22))
+```
+
+# Linear Regression
+
+## Simple Regression
+
+### Estimation
+```{r}
+gm2007 <- gapminder %>% filter(year == 2007)
+model_lm <- lm(lifeExp ~ gdpPercap, data = gm2007)
+model_lm
+```
+
+
+### Inference
+```{r}
+summary(model_lm)
+```
+
+Roughly 45% of the variation in lifeExp is explained by gdpPercapita at the country level.
+  There are lots of drawbacks and caveats to interpreting R-squared so only worry if its too low!
+  
+This could be done to basically check if a variable should be used as a predictor. See if the slope is significantly non-zero ie. p-value = pr(>|t|) is test hypothesis that slope is 0. This is a very limited test of a very high level question. It is possible that the p-value is large and it fails to reject the null hypothesis but the variable still is important. 
+  Therefore, statistical hypothesis tests and high level theories are not always in sync!
+
+```{r}
+coef(model_lm)
+confint(model_lm, level = 0.9)
+```
+
+Confidence intervals - gives more info than just whether the coefficient is 0 or not. Gives a range of values
+
+It is possible that p-value is very small and you reject null hypothesis that coefficient is 0 but it may also be true that one end of the confidence interval gets very very close to 0. This information is valuable and therefore you must look at confidence interval too!
+
+
+
+```{r}
+plot(model_lm)
+```
+You want your predicted model to capture all systematic variation ie. the residuals of your predicted model must look random.
+
+When you run plot() on model objects, it gives you 4 plots:
+  * Residual vs Fitted values: 
+        They 2 are not correlated for a linear model. Hence, we are looking for a non-linear relationship in this plot.
+        Here, we can see it's some sort of concave relationship. 
+        When the model is predicting a very large life expectancy, it systematically has -ve residual ie. overestimates
+  
+  * Standardizes residuals vs quantiles in Normal QQ plot: 
+        Shows the distribution of  standardized residuals compared to the gaussian distribution
+        Here, the points deviate from the dotted line. This means that the distribution isn't gaussian. 
+        We, therefore, need to be careful while interpreting our inferences about the coefficients, hypothesis tests and confidence interval of the hypothesis tests. In such a case, we must look for robust methods of inference
+  
+  * Square root of standardized residuals vs. Fitted values:
+
+  * Standardized residuals vs Leverage:
+        Helps find influential outliers
+        Leverage roughly tells us how much the entire model is influenced by that one data point
+        We can see that our model heavily depends on the 3 points on the extreme right - they could be outliers and might be pulling the model in a particular direction
+        
+        
+Another method of doing the same as plot() but using the ggfortify library
+```{r}
+library(ggfortify)
+autoplot(model_lm)
+```
+
+Another way of doing same as summary() function
+```{r}
+library(broom)
+glance(model_lm)
+tidy(model_lm)
+```
+
+```{r}
+augment(model_lm) %>%
+  ggplot(aes(x = gdpPercap, y = lifeExp)) + 
+  geom_point() + 
+  geom_line(aes(y = .fitted))
+```
+If we subtract the predictions (line) from the y-values (points), we will get the first plot of residuals vs fitted values as seen above with the plot() function. So, in simple linear model with 1 predictor variable, we can plot this and understand the entire model.
+
+
+
+
+
+## Multiple Regression
+
+```{r}
+library(palmerpenguins)
+head(penguins)
+```
+
+### Estimation
+```{r}
+model_penguins <- lm(body_mass_g ~ flipper_length_mm + species,
+                     data = penguins)
+```
+
+### Inference 
+
+```{r}
+summary(model_penguins)
+```
+
+Adjusted R-squared is 0.7807 here. 
+
+R-squared has this deficiency that adding predictor variables will always increase it. We can generate random noise numbers and add it as a predictor and R-squared will still increase :( 
+```{r}
+model_penguins_noise <- lm(body_mass_g ~ flipper_length_mm + species + noise1 + noise2 + noise3,
+                     data = penguins %>%
+                       mutate( noise1 = rnorm(n()),
+                               noise2 = rnorm(n()),
+                               noise3 = rnorm(n()) ))
+```
+
+```{r}
+summary(model_penguins_noise)
+```
+
+```{r}
+rbind(glance(model_penguins), 
+      glance(model_penguins_noise)
+)
+```
+Here, notice R-squared has increased for model_penguin_noise. That's why it is not a great indicator.
+So, we look at adjusted R-squared. Unfortunately, here, even it is increasing and not giving the right inference. 
+
+We prefer models which minimises AIC and BIC.  
+
+### Diagnostics
+
+```{r}
+plot(model_penguins)
+```
+
+```{r}
+library(GGally)
+ggpairs(penguins) #creates a plot for all pairs of variables
+```
+This is showing all possible 2-d projections of our data.
+
+If we only want for some selected variables:
+```{r}
+penguins %>% select(species, body_mass_g, flipper_length_mm) %>%
+  ggpairs()
+```
+The diagonal shows distributional summarizes of each variable
+Off-Diagonals show the relationship between 2 variables
+
+However, higher dimensional relationships are not visible to us in this plot and we might not be able to see some relationships.
+ Therefore, curese of dimensionality
+ 
+```{r}
+ggcoef(model_penguins)
+```
+
+This shows confidence intervals for each variable.

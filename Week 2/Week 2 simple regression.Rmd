@@ -1,0 +1,184 @@
+---
+title: "Week 2 Lecture - Simple Regression"
+author: "Kash"
+date: "06/01/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(gapminder)
+library(broom)
+```
+
+# Estimation
+
+```{r}
+gm2007 <- gapminder %>% filter(year==2007)
+model_lm <- lm(lifeExp ~ gdpPercap, data = gm2007)
+model_lm
+```
+
+
+# Slope coefficient of linear model:
+ * You take the corr between the two variables and scale that by the ratio of sd between the two variables
+ * SD of utcome variable in numberator - makes sense coz if outcome var has a greater spread then the slope will be steeper
+ * SD of x axis in denominator - makes sense coz if x axix var has greater spread, the slope would be less steeper
+
+$$
+\hat \beta_1 = \text{cor}(x,y) \frac{\text{sd}(y)}{\text{sd}(x)}
+$$
+Calculating SLOPE by hand:
+
+```{r}
+gm2007 %>% summarize(cor_xy = cor(gdpPercap, lifeExp),
+                     sd_x = sd(gdpPercap),
+                     sd_y = sd(lifeExp),
+                     hat_beta_1 = cor_xy * sd_y / sd_x) 
+# Summmarize() is tidyverse func that allows us to compute any functions
+```
+Notice the hat_beta_1 is the same value as we got using lm() function.
+
+# Intercept of linear model:
+
+Regression line passes through x_bar and y_bar
+$$
+(\bar x, \bar y)
+$$
+such that
+$$
+\bar y = \hat \beta_0 + \hat \beta_1 \bar x
+$$
+
+Calculating INTERCEPT by hand:
+
+```{r}
+gm2007 %>% summarize(cor_xy = cor(gdpPercap, lifeExp),
+                     sd_x = sd(gdpPercap),
+                     sd_y = sd(lifeExp),
+                     xbar = mean(gdpPercap),
+                     ybar = mean(lifeExp),
+                     hat_beta1 = cor_xy * sd_y / sd_x,
+                     hat_beta0 = ybar - hat_beta1 * xbar) 
+```
+Notice the intercept here is same as that from the lm() function.
+
+# IMPORTANT:
+ * formula for slope reminds you how it scales with the scale of both the axix.
+ * formula for slope reminds you that is has the same sign as the cor() between the two
+ * formula for intercept reminds you that line passes through a point which is the mean of both variables
+
+To calcualte this for all years in our data:
+GROUP_BY()
+```{r}
+gapminder %>% 
+  group_by(year) %>%
+  summarize(cor_xy = cor(gdpPercap, lifeExp),
+                     sd_x = sd(gdpPercap),
+                     sd_y = sd(lifeExp),
+                     xbar = mean(gdpPercap),
+                     ybar = mean(lifeExp),
+                     hat_beta1 = cor_xy * sd_y / sd_x,
+                     hat_beta0 = ybar - hat_beta1 * xbar) 
+```
+We can see how the estimate of the slope term hat_beta_1 changes over time. 
+It is not a stable relationship over time. 
+
+
+# Inference
+
+```{r}
+summary(model_lm)
+# tidy(model_lm) # tidy() in broom hsa the same output in different format
+```
+
+$$
+\text{SE}(\hat \beta_1) = \sqrt{\frac{\sigma^2}{\sum{}(x_i - \bar x)^2}}
+$$
+
+
+Obeservations:
+* SE of our estimate increases if the variance of our error term increases
+* denominator represents how much spread there is in x variable - can think of this as how much similarity there is in x variable? how much information there is in x variable? 
+    - If x variable is very varied, then it might be measuring something that actually varies in the real world and there might be something interesting going on, some information in the data.
+    
+SE is estimated by:
+$$
+\text{se}(\hat \beta_1) = \frac{\hat \sigma}{\sqrt{\sum_{}(x_i -\bar x)^2}}
+$$
+Where:
+$$
+\hat \sigma = \text{RSE} = \sqrt{\frac{\text{RSS}}{n-2}}
+$$
+
+```{r}
+augment(model_lm) %>%
+  summarize(RSS = sum(.resid^2),
+            RSE = sqrt(RSS/(n()-2)), # function n() calculates sample size
+            std.error = RSE / sqrt(sum((gdpPercap - mean(gdpPercap))^2))
+  )
+
+```
+
+Notice, this is same std error we got under summarize() or tidy() functions
+
+# Model Diagnostics
+
+All the models are based on some assumptions, and our inferences are only as good s these assumptions. So, we need to check whether these assumptions hold.
+
+For simple regression, we can check the R-squared and the residual R-squared
+```{r}
+summary(model_lm) # base R method
+glance(model_lm) # tidyverse method
+```
+Under simple regression, R-sqaured is just a correlation of the 2 variables sqaured
+$$
+R^2 = \text{cor}(x,y)^2
+$$
+So, caluating R-sqaured manually using base R method
+```{r}
+cor(gm2007$gdpPercap, gm2007$lifeExp)^2
+```
+
+Generally, the formula for R-sqaured is:
+$$
+R^2 = 1 - \frac{\text{RSS}}{\text{TSS}}
+$$
+where the Total Sum of Sqaures is just the sum of sqaures of centered y (by subtracting its mean).
+
+
+```{r}
+augment(model_lm) %>%
+  summarize(RSS = sum(.resid^2),
+            TSS = sum((lifeExp - mean(lifeExp))^2),
+            R2 = 1 - RSS/TSS)
+```
+
+We can use plots as a diagnostic tool:
+
+The idea is to look for patterns in residuals. 
+Bias-Variance decomposition: Errors can be decomposed into systemic (ie. related to bias) and non-systemic (ie. related to variance).
+
+If there is bias, it could indicate more serious problems with the model and we check for patterns in residuals as the systemic bias in model may show up as patterns in residual. 
+
+```{r}
+augment(model_lm) %>%
+  ggplot(aes(gdpPercap, .resid)) + 
+  geom_point()
+```
+
+This model has some serious problem. Clear patter as we move towards the right.
+
+In a lower dimensional problem, we can observe patterns with naked eyes. But as the dimensions increase, we cannot observe patterns and will need more complex toold to help us identify patterns.
+
+
+
+
+
+
+
+
+
+
+

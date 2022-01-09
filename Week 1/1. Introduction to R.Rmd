@@ -1,0 +1,368 @@
+---
+title: "Week 1 Introduction"
+author: "Kash"
+date: "03/01/2022"
+output: html_document
+---
+
+
+# installing packages
+```{r}
+# install.packages("tidyverse")
+# install.packages("gapminder")
+```
+
+# loading packages
+```{r}
+library(tidyverse)
+library(gapminder)
+library(broom) #tidy() glance()
+```
+
+# viewing data
+```{r}
+# gapminder
+# View(gapminder)
+```
+
+# plot using ggplot - within tidyverse
+```{r}
+ggplot(gapminder, aes(x = gdpPercap, y=lifeExp)) +
+  geom_point()
+```
+
+```{r}
+ggplot(gapminder %>% mutate(indicator = (country == "United Kingdom")), aes(x = gdpPercap, y = lifeExp)) + 
+  geom_point(aes(colour = indicator))
+
+# we can see that the UK has been repeated for a bunch of different years
+```
+
+So, now that we know a country is repeated, we might want to visualise just the latest year for each country:
+```{r}
+# piping is part of tidyverse
+gapminder %>% nrow()
+
+# filter is part of tidyverse
+gapminder %>% 
+  filter(country == "Afghanistan")
+
+# now we want to filter by year
+gapminder %>%
+  filter(year == 2007) %>%
+  pull(lifeExp) %>%
+  mean()
+```
+
+Lets combine plotitng and filtering
+```{r}
+gapminder %>%
+  filter( year == 2007) %>%
+  ggplot(aes(x=gdpPercap, y=lifeExp)) + 
+  geom_point()
+```
+
+# Moving on to regressions
+
+```{r}
+gapminder %>%
+  filter( year == 2007) %>%
+  ggplot(aes(x=gdpPercap, y=lifeExp)) + 
+  geom_point() + 
+  geom_smooth()
+```
+Linear Model
+```{r}
+gapminder %>%
+  filter( year == 2007) %>%
+  ggplot(aes(x=gdpPercap, y=lifeExp)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+```
+
+Saving variables and using functions
+```{r}
+gm2007 <- gapminder %>%
+  filter(year == 2007)
+
+lm(lifeExp ~ gdpPercap, data = gm2007)
+```
+
+We don't want this output and instead we want to save this result and apply functions to it
+```{r}
+model_lm <- lm(lifeExp ~ gdpPercap, data = gm2007)
+summary(model_lm) # gives you more than just the estimated coefficients ie. intercept and slope
+residuals(model_lm) # residuals of predictors ie. difference between predicted and true values
+predict(model_lm)
+```
+
+```{r}
+tidy(model_lm)
+```
+```{r}
+glance(model_lm) # model summary values and allows to compare several functions
+```
+
+```{r}
+augment(model_lm) 
+# gives us the original dataset plus predicted value from model, residuals, standard errors, etc
+# ie. very useful for applying the results of the model
+```
+
+```{r}
+augment(model_lm) %>%
+  ggplot(aes(gdpPercap, lifeExp)) + 
+  geom_point() +
+  geom_line(aes(gdpPercap, .fitted))
+```
+
+# ADDING COMPLEXITY BY CHANGING CLASS OF REGRESSION FUNCTION - LOESS
+
+Adding more complexity, not by adding more predictors, but by allowing a more flexible functional relationship (ie. not linear) using the LOESS function - Locally estimated Scatterplot Smoothing
+```{r}
+model_loess <- loess(lifeExp ~ gdpPercap, data = gm2007)
+summary(model_loess)
+# tidy(model_loess)     LOESS function doesnt have tidy()
+# glance(model_loess)   LOESS function doesnt have glance()
+```
+
+```{r}
+augment(model_loess) %>%
+  ggplot(aes(gdpPercap, lifeExp)) + 
+  geom_point() +
+  geom_line(aes(gdpPercap, .fitted))
+```
+
+#@ SPAN - controls the degree of smoothening
+
+LOESS will look at local data only. SPAN will tell us how local the data should be, changing is makes the data points in focus narrower or wider.
+
+```{r}
+# changing span to 0.3 makes a narrower focus and less smoother curve
+# closer span is to 1, the smoother the curve gets
+
+model_loess <- loess(lifeExp ~ gdpPercap, 
+                     span = 0.3,
+                     data = gm2007)
+augment(model_loess) %>%
+  ggplot(aes(gdpPercap, lifeExp)) + 
+  geom_point() +
+  geom_line(aes(gdpPercap, .fitted))
+```
+
+## DEGREE - degree of parameters to be used
+
+```{r}
+# This is locally degree 1 - ie. locally linear
+# again we increased span to make this curve smoother
+
+model_loess <- loess(lifeExp ~ gdpPercap, 
+                     span = 0.9,
+                     degree = 1,
+                     data = gm2007)
+augment(model_loess) %>%
+  ggplot(aes(gdpPercap, lifeExp)) + 
+  geom_point() +
+  geom_line(aes(gdpPercap, .fitted))
+```
+
+# ADDING COMPLEXITY - SQUARE OF PREDICTOR VARIABLE
+
+```{r}
+model_lm2 <- lm(lifeExp ~ gdpPercap + poly(gdpPercap,2), data = gm2007) # poly() creates polynomial of that degree
+augment(model_lm2) %>%
+  ggplot(aes(gdpPercap, lifeExp)) + 
+  geom_point() +
+  geom_line(aes(gdpPercap, .fitted))
+```
+
+Now with LOESS model
+
+```{r}
+# This is locally degree 1 - ie. locally linear
+# again we increased span to make this curve smoother
+
+model_loess <- loess(lifeExp ~ gdpPercap, 
+                     span = 0.5, # fit half of the dataset
+                     degree = 2,
+                     data = gm2007)
+augment(model_loess) %>%
+  ggplot(aes(gdpPercap, lifeExp)) + 
+  geom_point() +
+  geom_line(aes(gdpPercap, .fitted))
+```
+
+Both lm and loess used degree 2 polynomial but give very different results. This is because loess gives local flexibility vs lm being a global model.
+
+# ADDING COMPLEXITY - MORE PREDICTOR VARIABLES
+
+Getting to know the data
+
+```{r}
+library(fivethirtyeight) # has candy ranking dataset
+?candy_rankings # info about this dataset
+candy_rankings # view dataset
+```
+
+```{r}
+ggplot(candy_rankings, aes(x = pricepercent, y=winpercent)) + 
+  geom_point()
+```
+
+Linear Model
+
+```{r}
+model_lm <- lm(winpercent ~ pricepercent, data = candy_rankings)
+tidy(model_lm)
+```
+
+```{r}
+augment(model_lm) %>%
+  ggplot(aes(x = pricepercent, y = winpercent))+
+  geom_point()+
+  geom_line(aes(y=.fitted))
+```
+
+More Variables - categorical
+
+```{r}
+model_lm <- lm(winpercent ~ pricepercent + chocolate, data = candy_rankings)
+tidy(model_lm)
+```
+
+Notice, when you add categorical predictor to your linear model, you get the same simple regression line but you have different intercepts for the different levels of that categorical variable.
+Here, you can see an intercept for some baseline level of the categorical variable and then a shift in intercept for other levels relative to baseline level. Here, chocolate false is baseline group (41.57 intercept) and chocolate true is the other group (intercept of 41+18=59).
+
+```{r}
+augment(model_lm) %>%
+  ggplot(aes(x = pricepercent, y = winpercent, 
+             color = chocolate, 
+             shape = chocolate,
+             linetype = chocolate))+
+  geom_point()+
+  geom_line(aes(y=.fitted))
+```
+
+More variable - continuous
+
+```{r}
+
+```
+
+We we add continuous variables, we can no longer plot in 2D... Here, let's try to plot in 3D
+```{r}
+library(plotly)
+
+candy <- candy_rankings
+candy3d <- plot_ly(data = candy_rankings,
+                   x = ~pricepercent,
+                   y = ~sugarpercent,
+                   z = ~winpercent,
+                   type = "scatter3d")
+
+candy3d
+```
+
+```{r}
+model_lm <- lm(winpercent ~ pricepercent + sugarpercent, data = candy_rankings)
+
+xy_plane <- expand.grid(0:100, 0:100)/100
+
+ps_plane <- xy_plane %>%
+  rename(pricepercent = Var1,
+         sugarpercent = Var2)
+
+lm_plane <- augment(model_lm, newdata = ps_plane)
+lm_matrix <- matrix(lm_plane$.fitted, nrow = 101, ncol = 101)
+
+candy3d %>%
+  add_surface(
+    x = ~(0:100)/100,
+    y = ~(0:100)/100,
+    z = ~lm_matrix
+  )
+```
+
+```{r}
+tidy(model_lm)
+```
+
+More variables - both categorical and continuous
+
+```{r}
+chocolate3d <- plot_ly(data=candy_rankings,
+                       x = ~pricepercent,
+                       y = ~sugarpercent,
+                       z = ~winpercent,
+                       color = ~chocolate,
+                       colors = c("#2d708e","#d8576b"),
+                       made = "markers",
+                       symbol = ~chocolate,
+                       symbols = c("o","circle"),
+                       type = "scatter3d",
+                       showlegend = FALSE)
+
+chocolate3d
+```
+
+```{r}
+candy <- candy_rankings
+model_lm <- lm(winpercent ~ pricepercent + sugarpercent + chocolate, data = candy)
+
+ps_plane <- ps_plane %>% 
+  mutate(chocolate = TRUE)
+lm_plane <- augment(model_lm, newdata = ps_plane)
+lm_matrix_true <- matrix(lm_plane$.fitted, nrow = 101, ncol = 101)
+
+ps_plane <- ps_plane %>%
+  mutate(chocolate=FALSE)
+lm_plane <- augment(model_lm, newdata=ps_plane)
+lm_matrix_false <- matrix(lm_plane$.fitted, nrow = 101, ncol=101)
+
+chocolate3d %>%
+  add_surface(
+    x = ~(0:100)/100,
+    y = ~(0:100)/100,
+    z = ~lm_matrix_true,
+    showscale = FALSE,
+    inherit = FALSE,
+    colorscale = list(c(0,1),c("#f0f921","#7201a8"))) %>%
+  add_surface(
+    x = ~(0:100)/100,
+    y = ~(0:100)/100,
+    z = ~lm_matrix_false,
+    showscale = FALSE,
+    inherit = FALSE,
+    colorscale = list(c(0,1), c("#3cbb75","#481567")))
+```
+
+```{r}
+tidy(model_lm)
+```
+
+# Another model that uses all of the predictor variables in the dataset
+
+```{r}
+model_lm_all <- lm(winpercent ~ ., candy_rankings %>%
+                     select(-competitorname))
+tidy(model_lm_all)
+```
+
+Competitorname (ie. candy name) was a unique identifier and we want to avoid using that as a predictor otherwise we wont really be groupping anything. 
+
+# COMPARE DIFFERENT MODELS
+
+```{r}
+rbind(glance(model_lm), glance(model_lm_all))
+```
+
+We know that when we add more predictors, the R-squared should increase.
+Adjusted R-squared penalises R-squared using the ratio of predictors to sample size, so it can decrease when we add more predictors. Here, adjusted R-squared increased for model_lm_all which is an indicator that it was a model better at predicting the outcome.
+
+
+
+
+
+
+
+
