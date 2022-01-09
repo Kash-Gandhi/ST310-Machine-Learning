@@ -1,0 +1,105 @@
+---
+title: "Week 4 Seminar - Joshua"
+author: "Kash"
+date: "09/01/2022"
+output: html_document
+---
+
+# Optimization for Machine Learninf
+### Kashvi Gandhi
+
+
+```{r}
+library(tidyverse)
+library(broom)
+library(modelr)
+library(GGally)
+```
+
+# 1-D Smooth Regression Example
+
+## Generate a one-dimensional example with a non-linear relationship
+```{r}
+f <- function(x) sin(4*pi*x)  # a 1-d conditional expectation func (non-linear) 
+
+# Generate data around the CEF model we know above
+n <- 200
+train1d <- data.frame(x = rbeta(n,1,3)) %>%
+  mutate( y = f(x) + rnorm(n,sd=0.1) )    # Change the noise level sd
+
+# Plot data and loess curve to see of our code does a good job at modeling the data
+ggplot(train1d, aes(x,y)) +
+  geom_point() + 
+  geom_smooth()  # geom_smooth() uses method='loess' automatically
+```
+Obviously allowing ggplot() to do its standard smoothening method does not do a good job at modelling our data. This is obviously a bad model towards the end as it is not close to a sin-wave.
+
+### Solution 1: increase sample size
+```{r}
+f <- function(x) sin(4*pi*x)  # a 1-d conditional expectation func (non-linear) 
+
+# Generate data around the CEF model we know above
+n <- 2000
+train1d <- data.frame(x = rbeta(n,1,3)) %>%
+  mutate( y = f(x) + rnorm(n,sd=0.1) )    # Change the noise level sd
+
+# Plot data and loess curve to see of our code does a good job at modeling the data
+ggplot(train1d, aes(x,y)) +
+  geom_point() + 
+  geom_smooth()  # geom_smooth() uses method='loess' automatically
+```
+Notice: There are more points towards the left and less observations towards the right of the plot!
+  * When we generate the data here, we sample our predictor variable from a distribution that is not uniform...
+  * We did this on purpose - in real life, datasets usually have a lot of observations near a particular value and lesser observations near some other value
+  * When you have fewer observations nearby, it is harder to fit a complex dataset (here, the quality of the fit is amazing when x is smaller)
+  
+  
+### Solution 2: Try to sample more observations from the part of your predictor space that is lacking. 
+
+
+
+Both these solutions are good solutions if we have the power to change our sample - ie. gather more data
+
+Let's understand how geom_smooth() works
+```{r}
+?geom_smooth
+```
+Span - controls the degree of smoothening and its default is 0.75    
+
+So, let's change span
+```{r}
+f <- function(x) sin(4*pi*x)  # a 1-d conditional expectation func (non-linear) 
+
+# Generate data around the CEF model we know above
+n <- 200
+train1d <- data.frame(x = rbeta(n,1,3)) %>%
+  mutate( y = f(x) + rnorm(n,sd=0.1) )    # Change the noise level sd
+
+# Plot data and loess curve to see of our code does a good job at modeling the data
+ggplot(train1d, aes(x,y)) +
+  geom_point() + 
+  geom_smooth(span = 1)  # use entire dataset
+```
+  
+```{r}
+f <- function(x) sin(4*pi*x)  # a 1-d conditional expectation func (non-linear) 
+
+# Generate data around the CEF model we know above
+n <- 200
+train1d <- data.frame(x = rbeta(n,1,3)) %>%
+  mutate( y = f(x) + rnorm(n,sd=0.1) )    # Change the noise level sd
+
+# Plot data and loess curve to see of our code does a good job at modeling the data
+ggplot(train1d, aes(x,y)) +
+  geom_point() + 
+  geom_smooth(span= .2)  # Decrease span
+```
+
+
+## Fitting polynomial model - Linear regression with a polynomial transformation of x
+
+
+
+
+
+
